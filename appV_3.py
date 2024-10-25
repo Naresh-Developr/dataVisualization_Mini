@@ -15,7 +15,7 @@ CHART_ICONS = {
     'bar': '📊',
     'scatter': '📉',
     'pie': '🥧',
-    'histogram': '📶',
+    'histo': '📶',
     'box': '📦'
 }
 
@@ -61,34 +61,23 @@ def get_chart_suggestion(model, df, user_prompt):
     
     print(response)
     try:
-        suggestions = json.loads(response.text)
-        
-        # Ensure we return a single column for x_axis and y_axis, not a list
-        for suggestion in suggestions:
-            if isinstance(suggestion['x_axis'], list):
-                suggestion['x_axis'] = suggestion['x_axis'][0]  # Take the first column for x_axis
-            if isinstance(suggestion['y_axis'], list):
-                suggestion['y_axis'] = suggestion['y_axis'][0]  # Take the first column for y_axis
-        
-        return suggestions
-    except Exception as e:
-        st.error(f"Error in AI response processing: {str(e)}")
-        return None
+        return json.loads(response.text)
+    except:
+        return None  # Return None if the response is not valid JSON
 
 def create_chart(chart_type, df, x_col, y_col, additional_params=None):
     if additional_params is None:
         additional_params = {}
     
-    # Ensure that color_col and size_col are single columns, not lists
+    # Ensure that x_col and y_col are strings (not lists)
+    if isinstance(x_col, list):
+        x_col = x_col[0]  # Pick the first element if it's a list
+    if isinstance(y_col, list):
+        y_col = y_col[0]  # Pick the first element if it's a list
+    
     color_col = additional_params.get('color')
     size_col = additional_params.get('size')
-
-    if isinstance(color_col, list):
-        color_col = color_col[0]  # Take the first color column if it's a list
-    if isinstance(size_col, list):
-        size_col = size_col[0]  # Take the first size column if it's a list
     
-    # Chart creation logic
     if chart_type == "line":
         fig = px.line(df, x=x_col, y=y_col, color=color_col, title=f"{y_col} vs {x_col}")
     elif chart_type == "scatter":
@@ -113,6 +102,8 @@ def main():
         st.session_state.df = None
     if 'suggested_chart' not in st.session_state:
         st.session_state.suggested_chart = None
+    if 'selected_chart_type' not in st.session_state:
+        st.session_state.selected_chart_type = None
 
     # File upload
     uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
@@ -148,74 +139,66 @@ def main():
                 try:
                     model = initialize_gemini()
                     suggestion = get_chart_suggestion(model, st.session_state.df, user_prompt)
-                    st.session_state.suggested_chart = suggestion
-
-                    st.write("### AI Suggestion")
                     
-                    # Check if suggested_chart is a list or a dictionary
-                    if isinstance(st.session_state.suggested_chart, list):
-                        for suggestion in st.session_state.suggested_chart:
-                            st.write(f"Recommended Chart: {suggestion['chart_type'].title()} Chart")
-                            st.write(f"X-axis: {suggestion['x_axis']}")
-                            st.write(f"Y-axis: {suggestion['y_axis']}")
+                    if suggestion is None:
+                        st.error("Error generating visualization: No valid suggestion received.")
                     else:
-                        st.write(f"Recommended Chart: {st.session_state.suggested_chart['chart_type'].title()} Chart")
-                        st.write(f"X-axis: {st.session_state.suggested_chart['x_axis']}")
-                        st.write(f"Y-axis: {st.session_state.suggested_chart['y_axis']}")
-                        st.write("Reasoning:", st.session_state.suggested_chart['reasoning'])
+                        st.session_state.suggested_chart = suggestion
+                        st.session_state.selected_chart_type = st.session_state.suggested_chart[0]['chart_type']
+                        st.write("### AI Suggestion")
+                        
+                        # Check if suggested_chart is a list or a dictionary
+                        if isinstance(st.session_state.suggested_chart, list):
+                            for suggestion in st.session_state.suggested_chart:
+                                st.write(f"Recommended Chart: {suggestion['chart_type'].title()} Chart")
+                                st.write(f"X-axis: {suggestion['x_axis']}")
+                                st.write(f"Y-axis: {suggestion['y_axis']}")
+                        else:
+                            st.write(f"Recommended Chart: {st.session_state.suggested_chart['chart_type'].title()} Chart")
+                            st.write(f"X-axis: {st.session_state.suggested_chart['x_axis']}")
+                            st.write(f"Y-axis: {st.session_state.suggested_chart['y_axis']}")
+                            st.write("Reasoning:", st.session_state.suggested_chart['reasoning'])
 
                 except Exception as e:
                     st.error(f"Error generating visualization: {str(e)}")
 
             # Render the chart below the suggestion button
-            if st.session_state.suggested_chart:
-                if isinstance(st.session_state.suggested_chart, list):
-                    # Use the first suggestion in the list to create the chart
-                    first_suggestion = st.session_state.suggested_chart[0]
-                    fig = create_chart(
-                        first_suggestion['chart_type'],
-                        st.session_state.df,
-                        first_suggestion['x_axis'],
-                        first_suggestion['y_axis'],
-                        first_suggestion.get('additional_params', {})
-                    )
-                else:
-                    fig = create_chart(
-                        st.session_state.suggested_chart['chart_type'],
-                        st.session_state.df,
-                        st.session_state.suggested_chart['x_axis'],
-                        st.session_state.suggested_chart['y_axis'],
-                        st.session_state.suggested_chart.get('additional_params', {})
-                    )
-                
-                st.plotly_chart(fig, use_container_width=True)
+            if st.session_state.suggested_chart and st.session_state.selected_chart_type:
+                # Find the chart type that is currently selected and render it
+                for suggestion in st.session_state.suggested_chart:
+                    if suggestion['chart_type'] == st.session_state.selected_chart_type:
+                        fig = create_chart(
+                            suggestion['chart_type'],
+                            st.session_state.df,
+                            suggestion['x_axis'],
+                            suggestion['y_axis'],
+                            suggestion.get('additional_params', {})
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
 
         # Right column for chart selection
         with col3:
             st.subheader("Chart Selection")
 
+            # Extract the suggested chart types
+            suggested_chart_types = []
+            if isinstance(st.session_state.suggested_chart, list):
+                suggested_chart_types = [s['chart_type'] for s in st.session_state.suggested_chart]
+            elif st.session_state.suggested_chart:
+                suggested_chart_types.append(st.session_state.suggested_chart['chart_type'])
+
             # Create chart selection grid
             cols = st.columns(3)
-            
-            # Determine which charts are suggested by the AI
-            enabled_charts = {s['chart_type'] for s in st.session_state.suggested_chart} if st.session_state.suggested_chart else set()
-
             for idx, (chart_type, icon) in enumerate(CHART_ICONS.items()):
-                enabled = (chart_type in enabled_charts)
+                enabled = chart_type in suggested_chart_types  # Enable only AI-suggested chart types
 
                 with cols[idx % 3]:
-                    if st.button(f"{icon} {chart_type.title()}", disabled=not enabled):
-                        # Generate the chart when an icon is clicked
-                        selected_suggestion = next((s for s in st.session_state.suggested_chart if s['chart_type'] == chart_type), None)
-                        if selected_suggestion:
-                            fig = create_chart(
-                                selected_suggestion['chart_type'],
-                                st.session_state.df,
-                                selected_suggestion['x_axis'],
-                                selected_suggestion['y_axis'],
-                                selected_suggestion.get('additional_params', {})
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
+                    st.button(
+                        f"{icon} {chart_type.title()}",
+                        disabled=not enabled,  # Disable buttons for non-suggested chart types
+                        key=f"chart_{chart_type}",
+                        on_click=lambda chart_type=chart_type: st.session_state.update(selected_chart_type=chart_type)
+                    )
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
