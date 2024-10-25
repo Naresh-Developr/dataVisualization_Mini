@@ -50,7 +50,7 @@ def read_csv_with_encoding(uploaded_file):
 def get_chart_suggestion(model, columns, column_types):
     # Prompt engineering for chart suggestions
     prompt = f"""
-    As a data visualization expert, suggest the best chart type (choose between 'line', 'bar', 'scatter') 
+    As a data visualization expert, suggest the best chart type (choose between 'line', 'bar', 'scatter', 'pie', 'histogram') 
     based on these columns and their data types: {columns} with types {column_types}.
     Return your response as a JSON object with this structure:
     {{
@@ -63,6 +63,8 @@ def get_chart_suggestion(model, columns, column_types):
     """
     
     response = model.generate_content(prompt)
+    print(response)
+    print()
     try:
         return json.loads(response.text)
     except:
