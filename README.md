@@ -22,13 +22,15 @@ This project is designed to visualize CSV data using Streamlit and Plotly. The a
    ```bash
    pip install -r requirements.txt
    ```
+3. **Api Key Integration [Gemini] **:
+   - create a file named secerets.toml inside .streamlit folderand paste GEMINI_API_KEY = "YOUR_API_KEY" 
 
-3. **Run the Streamlit app**:
+4. **Run the Streamlit app**:
    ```bash
    streamlit run app.py
    ```
 
-4. **Upload your CSV file** and view the data visualizations.
+5. **Upload your CSV file** and view the data visualizations.
 
 ## Dependencies
 
