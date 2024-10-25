@@ -1,3 +1,8 @@
+<<<<<<< HEAD
 /__pycache__
 .streamlit
+=======
+/_pycache_
+/.streamlit
+>>>>>>> e21c41493ad4a1b612fad628fb75326bf6ac73fa
 sample_sales_report.csv

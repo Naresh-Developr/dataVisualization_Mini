@@ -7,7 +7,7 @@ import chardet
 from prompt import data_visualization_prompt
 
 # Configure page
-st.set_page_config(page_title="CSV Visualizer", layout="wide")
+st.set_page_config(page_title="Kutty Tableau", layout="wide")
 
 # Define chart icons and their descriptions
 CHART_ICONS = {
@@ -16,7 +16,7 @@ CHART_ICONS = {
     'scatter': {'icon': '📉', 'description': 'Shows relationships between variables'},
     'pie': {'icon': '🥧', 'description': 'Displays part-to-whole relationships'},
     'histogram': {'icon': '📶', 'description': 'Shows distribution of data'},
-    'box': {'icon': '📦', 'description': 'Displays data distribution and outliers'}
+    'funnel': {'icon': '📦', 'description': 'Displays data distribution and outliers'}  # Updated key for funnel chart
 }
 
 def initialize_gemini():
@@ -67,7 +67,7 @@ def calculate_suitability_score(df, x_col, y_col, chart_type):
     x_is_numeric = pd.api.types.is_numeric_dtype(df[x_col])
     y_is_numeric = pd.api.types.is_numeric_dtype(df[y_col])
     try:
-        df[x_col] = pd.to_datetime(df[x_col])
+        df[x_col] = pd.to_datetime(df[x_col], format="%Y-%m-%d")
         x_is_temporal = True
     except:
         x_is_temporal = False
@@ -139,6 +139,8 @@ def get_chart_suggestion(model, df, user_prompt):
         st.error(f"Error in AI response processing: {str(e)}")
         return None
 
+
+
 def create_chart(chart_type, df, x_col, y_col, additional_params=None):
     if additional_params is None:
         additional_params = {}
@@ -167,6 +169,8 @@ def create_chart(chart_type, df, x_col, y_col, additional_params=None):
         elif chart_type == "box":
             fig = px.box(df, x=x_col, y=y_col, color=color_col,
                         title=f"{y_col} by {x_col}")
+        elif chart_type == "funnel":  # Add funnel chart logic
+            fig = px.funnel(df, x=x_col, y=y_col, title=f"Funnel Chart: {y_col} by {x_col}")
         else:  # Default to bar chart
             fig = px.bar(df, x=x_col, y=y_col, color=color_col,
                         title=f"{y_col} vs {x_col}")
@@ -182,7 +186,7 @@ def create_chart(chart_type, df, x_col, y_col, additional_params=None):
         return None
 
 def main():
-    st.title("CSV Data Visualizer")
+    st.title("Kutty Tableau")
 
     # Initialize session state
     if 'df' not in st.session_state:
@@ -204,8 +208,8 @@ def main():
 
         st.session_state.df = df
 
-        # Create layout with two columns (column display, chart selection with AI suggestions)
-        col1, col2 = st.columns([1, 2])
+        # Create layout with three columns
+        col1, col2, col3 = st.columns([1, 2, 1])
 
         # Left column for displaying columns
         with col1:
@@ -217,15 +221,13 @@ def main():
                     if pd.api.types.is_numeric_dtype(df[col]):
                         st.write(f"Range: {df[col].min()} to {df[col].max()}")
 
-        # Right column for user input, chart selection, and chart suggestion scores
+        # Middle column for user input and visualization
         with col2:
             st.subheader("Describe Your Visualization Need")
             user_prompt = st.text_area(
                 "What would you like to visualize from this data?",
-# Continuation of the code
-
-height=100,
-placeholder="E.g., 'Show me the trend of sales over time' or 'Compare revenue across different categories'"
+                height=100,
+                placeholder="E.g., 'Show me the trend of sales over time' or 'Compare revenue across different categories'"
             )
 
             if st.button("Get Visualization Suggestion"):
@@ -241,42 +243,44 @@ placeholder="E.g., 'Show me the trend of sales over time' or 'Compare revenue ac
                 except Exception as e:
                     st.error(f"Error generating visualization: {str(e)}")
 
-            # Display chart suggestions and chart selection
-            st.subheader("Chart Selection with AI Suggestions")
-
-            for chart_type, info in CHART_ICONS.items():
-                is_recommended = False
-                score_text = ""
-                
-                # Check if this chart type is recommended
-                if st.session_state.chart_suggestions:
-                    matching_suggestion = next((s for s in st.session_state.chart_suggestions if s['chart_type'] == chart_type), None)
-                    if matching_suggestion:
-                        is_recommended = True
-                        score_text = f" (Score: {matching_suggestion['suitability_score']}/10)"
-
-                # Create button with conditional styling
-                button_style = "primary" if is_recommended else "secondary"
-                if st.button(
-                    f"{info['icon']} {chart_type.title()}{score_text}",
-                    key=f"btn_{chart_type}",
-                    type=button_style,
-                    help=info['description']
-                ):
-                    # If clicked, update the selected chart
-                    if is_recommended:
-                        st.session_state.selected_chart = matching_suggestion
-
-            # Render the selected chart
+            # Display chart suggestions and visualization
             if st.session_state.selected_chart:
+                st.write(f"### Selected Chart: {st.session_state.selected_chart['chart_type'].title()} Chart")
+                st.write(f"**Suitability Score**: {st.session_state.selected_chart['suitability_score']}/10")
+                
                 fig = create_chart(
                     st.session_state.selected_chart['chart_type'],
                     st.session_state.df,
                     st.session_state.selected_chart['x_axis'],
                     st.session_state.selected_chart['y_axis']
                 )
+                
                 if fig:
                     st.plotly_chart(fig, use_container_width=True)
+
+        # Right column for chart selection
+        with col3:
+            st.subheader("Chart Selection")
+            
+            # Create chart selection grid
+            for chart_type, info in CHART_ICONS.items():
+                is_recommended = False
+                if st.session_state.chart_suggestions:
+                    is_recommended = any(s['chart_type'] == chart_type for s in st.session_state.chart_suggestions[:3])
+                
+                button_style = "primary" if is_recommended else "secondary"
+                if st.button(
+                    f"{info['icon']} {chart_type.title()}", 
+                    key=f"btn_{chart_type}",
+                    type=button_style,
+                    help=info['description']
+                ):
+                    matching_suggestion = next(
+                        (s for s in st.session_state.chart_suggestions if s['chart_type'] == chart_type),
+                        st.session_state.chart_suggestions[0] if st.session_state.chart_suggestions else None
+                    )
+                    if matching_suggestion:
+                        st.session_state.selected_chart = matching_suggestion
 
 if __name__ == '__main__':
     main()
