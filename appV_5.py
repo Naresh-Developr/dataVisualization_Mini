@@ -204,8 +204,8 @@ def main():
 
         st.session_state.df = df
 
-        # Create layout with three columns
-        col1, col2, col3 = st.columns([1, 2, 1])
+        # Create layout with two columns (column display, chart selection with AI suggestions)
+        col1, col2 = st.columns([1, 2])
 
         # Left column for displaying columns
         with col1:
@@ -217,13 +217,15 @@ def main():
                     if pd.api.types.is_numeric_dtype(df[col]):
                         st.write(f"Range: {df[col].min()} to {df[col].max()}")
 
-        # Middle column for user input and visualization
+        # Right column for user input, chart selection, and chart suggestion scores
         with col2:
             st.subheader("Describe Your Visualization Need")
             user_prompt = st.text_area(
                 "What would you like to visualize from this data?",
-                height=100,
-                placeholder="E.g., 'Show me the trend of sales over time' or 'Compare revenue across different categories'"
+# Continuation of the code
+
+height=100,
+placeholder="E.g., 'Show me the trend of sales over time' or 'Compare revenue across different categories'"
             )
 
             if st.button("Get Visualization Suggestion"):
@@ -239,54 +241,42 @@ def main():
                 except Exception as e:
                     st.error(f"Error generating visualization: {str(e)}")
 
-            # Display chart suggestions and visualization
-            if st.session_state.chart_suggestions:
-                st.write("### AI Suggestions")
-                
-                for suggestion in st.session_state.chart_suggestions[:3]:  # Show top 3 suggestions
-                    chart_type = suggestion['chart_type']
-                    if chart_type in CHART_ICONS:
-                        with st.expander(f"{CHART_ICONS[chart_type]['icon']} {chart_type.title()} Chart (Score: {suggestion['suitability_score']}/10)"):
-                            st.write(f"X-axis: {suggestion['x_axis']}")
-                            st.write(f"Y-axis: {suggestion['y_axis']}")
-                            st.write(f"Description: {CHART_ICONS[chart_type]['description']}")
-                
-                if st.session_state.selected_chart:
-                    fig = create_chart(
-                        st.session_state.selected_chart['chart_type'],
-                        st.session_state.df,
-                        st.session_state.selected_chart['x_axis'],
-                        st.session_state.selected_chart['y_axis']
-                    )
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True)
+            # Display chart suggestions and chart selection
+            st.subheader("Chart Selection with AI Suggestions")
 
-        # Right column for chart selection
-        with col3:
-            st.subheader("Chart Selection")
-            
-            # Create chart selection grid
             for chart_type, info in CHART_ICONS.items():
-                # Check if this chart type is recommended
                 is_recommended = False
-                if st.session_state.chart_suggestions:
-                    is_recommended = any(s['chart_type'] == chart_type for s in st.session_state.chart_suggestions[:3])
+                score_text = ""
                 
+                # Check if this chart type is recommended
+                if st.session_state.chart_suggestions:
+                    matching_suggestion = next((s for s in st.session_state.chart_suggestions if s['chart_type'] == chart_type), None)
+                    if matching_suggestion:
+                        is_recommended = True
+                        score_text = f" (Score: {matching_suggestion['suitability_score']}/10)"
+
                 # Create button with conditional styling
                 button_style = "primary" if is_recommended else "secondary"
                 if st.button(
-                    f"{info['icon']} {chart_type.title()}", 
+                    f"{info['icon']} {chart_type.title()}{score_text}",
                     key=f"btn_{chart_type}",
                     type=button_style,
                     help=info['description']
                 ):
-                    # Find matching suggestion or create new one
-                    matching_suggestion = next(
-                        (s for s in st.session_state.chart_suggestions if s['chart_type'] == chart_type),
-                        st.session_state.chart_suggestions[0] if st.session_state.chart_suggestions else None
-                    )
-                    if matching_suggestion:
+                    # If clicked, update the selected chart
+                    if is_recommended:
                         st.session_state.selected_chart = matching_suggestion
+
+            # Render the selected chart
+            if st.session_state.selected_chart:
+                fig = create_chart(
+                    st.session_state.selected_chart['chart_type'],
+                    st.session_state.df,
+                    st.session_state.selected_chart['x_axis'],
+                    st.session_state.selected_chart['y_axis']
+                )
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True)
 
 if __name__ == '__main__':
     main()
