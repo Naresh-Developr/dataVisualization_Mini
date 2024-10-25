@@ -1,6 +1,7 @@
-streamlit
-pandas
-google.generativeai
 plotly
 chardet
+<<<<<<< HEAD
 numpy
+=======
+generativeai
+>>>>>>> 3ba788fcdf13d6f71427a11869be7167d1c3bea0
