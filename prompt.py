@@ -5,11 +5,13 @@ def data_visualization_prompt(user_prompt, csv_data_overview):
         1. **Analyze CSV Structure**:
            - The CSV data contains columns as follows: {csv_data_overview}.
            - Review and analyze the column types (e.g., numeric, categorical, date) and relationships between columns to suggest appropriate visualizations.
+           - Analyze the user prompt, if there is any requirement for filtering process (for eg: show the sales  of product B in Asia region) do it efficiently and correctly,
 
         2. **Chart Type Suggestion**:
            - Based on the user prompt, recommend 5 chart types from the following options: 
              - Bar chart, Line chart, Pie chart, Scatter plot, Histogram.
            - Ensure that each recommendation aligns with the data type and user intent.
+           - Handle these types of errors (Error in AI response processing: 'Frequency'. No suitable visualization suggestions found.)
 
         3. **JSON Output Format**:
            - For each suggested chart type, provide the output in the following format as a list:
