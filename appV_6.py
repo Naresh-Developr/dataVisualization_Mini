@@ -34,6 +34,7 @@ def main():
         st.session_state.chart_suggestions = None
     if 'selected_chart' not in st.session_state:
         st.session_state.selected_chart = None
+    
 
     # File upload
     uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
@@ -70,9 +71,10 @@ def main():
             )
 
             if st.button("Get Visualization Suggestion"):
+                print('-------------------------------------------------------------------------------------------------------')
                 try:
                     model = initialize_gemini()
-                    suggestions = chart.get_chart_suggestion(model, st.session_state.df, user_prompt)
+                    suggestions, df_filter = chart.get_chart_suggestion(model, st.session_state.df, user_prompt)
                     if suggestions:
                         st.session_state.chart_suggestions = suggestions
                         st.session_state.selected_chart = suggestions[0]
@@ -89,7 +91,7 @@ def main():
                 
                 fig = chart.create_chart(
                     st.session_state.selected_chart['chart_type'],
-                    st.session_state.df,
+                    df_filter,
                     st.session_state.selected_chart['x_axis'],
                     st.session_state.selected_chart['y_axis']
                 )
