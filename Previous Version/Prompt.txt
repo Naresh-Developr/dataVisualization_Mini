@@ -1,0 +1,4 @@
+1. Show me the trend of sales over time - Line Chart 
+2. Compare the total revenue across different regions - Bar Chart
+3. Show the product performance by region - pie chart, Funnel chart
+4. Show the sales of the product B over dates

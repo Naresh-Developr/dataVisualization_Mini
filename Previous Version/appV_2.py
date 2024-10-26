@@ -4,6 +4,7 @@ import plotly.express as px
 import google.generativeai as genai
 import json
 import chardet
+from prompt import data_visualization_prompt  # Import the prompt generator
 
 # Configure page
 st.set_page_config(page_title="CSV Visualizer", layout="wide")
@@ -53,33 +54,11 @@ def read_csv_with_encoding(uploaded_file):
         return None, f"Error reading file: {str(e)}"
 
 def get_chart_suggestion(model, df, user_prompt):
-    # Enhanced prompt engineering for chart suggestions
-    base_prompt = f"""
-    As a data visualization expert, analyze this dataset and user's requirement:
+    # Generate prompt using the external prompt function
+    csv_overview = list(df.columns)
+    prompt = data_visualization_prompt(user_prompt, csv_overview)  # Using prompt from prompt.py
+    response = model.generate_content(prompt)
     
-    Dataset Columns: {list(df.columns)}
-    Column Types: {df.dtypes.to_dict()}
-    Sample Data: {df.head().to_dict()}
-    
-    User's Requirement: {user_prompt}
-    
-    Suggest the best visualization approach by returning a JSON object with this structure:
-    {{
-        "chart_type": "one of: line/bar/scatter/pie/histogram/box",
-        "x_axis": "suggested column name for x-axis",
-        "y_axis": "suggested column name for y-axis",
-        "reasoning": "detailed explanation of why this chart type and columns are suitable",
-        "additional_params": {{
-            "color": "suggested column for color differentiation (if applicable)",
-            "size": "suggested column for size variation (if applicable)",
-            "grouping": "suggested column for grouping (if applicable)"
-        }}
-    }}
-    Consider the data types, relationships, and user's specific requirements.
-    Only return the JSON object, no other text.
-    """
-    
-    response = model.generate_content(base_prompt)
     print(response)
     try:
         return json.loads(response.text)
@@ -161,23 +140,43 @@ def main():
                     st.session_state.suggested_chart = suggestion
 
                     st.write("### AI Suggestion")
-                    st.write(f"Recommended Chart: {suggestion['chart_type'].title()} Chart")
-                    st.write(f"X-axis: {suggestion['x_axis']}")
-                    st.write(f"Y-axis: {suggestion['y_axis']}")
-                    st.write("Reasoning:", suggestion['reasoning'])
+                    
+                    # Check if suggested_chart is a list or a dictionary
+                    if isinstance(st.session_state.suggested_chart, list):
+                        for suggestion in st.session_state.suggested_chart:
+                            st.write(f"Recommended Chart: {suggestion['chart_type'].title()} Chart")
+                            st.write(f"X-axis: {suggestion['x_axis']}")
+                            st.write(f"Y-axis: {suggestion['y_axis']}")
+                    else:
+                        st.write(f"Recommended Chart: {st.session_state.suggested_chart['chart_type'].title()} Chart")
+                        st.write(f"X-axis: {st.session_state.suggested_chart['x_axis']}")
+                        st.write(f"Y-axis: {st.session_state.suggested_chart['y_axis']}")
+                        st.write("Reasoning:", st.session_state.suggested_chart['reasoning'])
 
                 except Exception as e:
                     st.error(f"Error generating visualization: {str(e)}")
 
             # Render the chart below the suggestion button
             if st.session_state.suggested_chart:
-                fig = create_chart(
-                    st.session_state.suggested_chart['chart_type'],
-                    st.session_state.df,
-                    st.session_state.suggested_chart['x_axis'],
-                    st.session_state.suggested_chart['y_axis'],
-                    st.session_state.suggested_chart.get('additional_params', {})
-                )
+                if isinstance(st.session_state.suggested_chart, list):
+                    # Use the first suggestion in the list to create the chart
+                    first_suggestion = st.session_state.suggested_chart[0]
+                    fig = create_chart(
+                        first_suggestion['chart_type'],
+                        st.session_state.df,
+                        first_suggestion['x_axis'],
+                        first_suggestion['y_axis'],
+                        first_suggestion.get('additional_params', {})
+                    )
+                else:
+                    fig = create_chart(
+                        st.session_state.suggested_chart['chart_type'],
+                        st.session_state.df,
+                        st.session_state.suggested_chart['x_axis'],
+                        st.session_state.suggested_chart['y_axis'],
+                        st.session_state.suggested_chart.get('additional_params', {})
+                    )
+                
                 st.plotly_chart(fig, use_container_width=True)
 
         # Right column for chart selection
