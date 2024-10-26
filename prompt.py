@@ -48,4 +48,4 @@ def data_visualization_prompt(user_prompt, csv_data_overview):
         5. **User Query**: 
            - The user's query: "{user_prompt}"
     """
-    return prompt
+    return prompt 
