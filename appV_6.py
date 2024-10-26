@@ -7,7 +7,7 @@ import read_csv
 import chart
 
 # Configure page
-st.set_page_config(page_title="Kutty Tableau", layout="wide")
+
 
 # Define chart icons and their descriptions
 CHART_ICONS = {
