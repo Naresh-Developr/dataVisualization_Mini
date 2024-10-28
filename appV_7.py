@@ -1,7 +1,23 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import google.generativeai as genai
+import json
 import chardet
+from prompt import data_visualization_prompt
+
+# Configure page
+st.set_page_config(page_title="Kutty Tableau", layout="wide")
+
+# Define chart icons and their descriptions
+CHART_ICONS = {
+    'line': {'icon': '📈', 'description': 'Best for temporal data and trends'},
+    'bar': {'icon': '📊', 'description': 'Good for comparing categories'},
+    'scatter': {'icon': '📉', 'description': 'Shows relationships between variables'},
+    'pie': {'icon': '🥧', 'description': 'Displays part-to-whole relationships'},
+    'histogram': {'icon': '📶', 'description': 'Shows distribution of data'},
+    'funnel': {'icon': '📦', 'description': 'Displays data distribution and outliers'}
+}
 
 # Initialize Gemini API
 def initialize_gemini():
@@ -10,16 +26,13 @@ def initialize_gemini():
     return model
 
 def detect_encoding(file_content):
-    """Detect the encoding of the file using chardet"""
     result = chardet.detect(file_content)
     return result['encoding']
 
 def read_csv_with_encoding(uploaded_file):
-    """Read CSV file with proper encoding detection"""
     try:
         bytes_data = uploaded_file.getvalue()
         encoding = detect_encoding(bytes_data)
-        
         try:
             df = pd.read_csv(uploaded_file, encoding=encoding)
             return df, None
@@ -32,12 +45,11 @@ def read_csv_with_encoding(uploaded_file):
                     return df, None
                 except UnicodeDecodeError:
                     continue
-            
             return None, "Unable to read the file with any common encoding."
     except Exception as e:
         return None, f"Error reading file: {str(e)}"
 
-# Function to generate Pandas filtering code using AI
+# Filtering method integration
 def generate_pandas_filter_code(model, user_prompt, df_columns):
     # Create the AI prompt for generating the Pandas filtering code
     ai_prompt = f"""
@@ -59,28 +71,20 @@ def generate_pandas_filter_code(model, user_prompt, df_columns):
 
     Only output the code without any explanation.
     """
-    
     response = model.generate_content(ai_prompt)
-    
-    return response.text.strip()  # Return the generated Pandas code
+    return response.text.strip()
 
-
-
-# Function to execute generated Pandas code and filter the DataFrame
 def filter_data_with_pandas_code(df, pandas_code):
     try:
-        # Execute the generated Pandas code to filter the DataFrame
         filtered_df = eval(pandas_code, {'df': df, 'pd': pd})
         return filtered_df
     except Exception as e:
         st.error(f"Error executing the generated pandas code: {str(e)}")
-        return None
+        return None 
 
-# Main Streamlit function
 def main():
     st.title("CSV Data Visualizer")
 
-    # Initialize session state
     if 'df' not in st.session_state:
         st.session_state.df = None
     if 'filtered_df' not in st.session_state:
@@ -88,55 +92,35 @@ def main():
     if 'generated_code' not in st.session_state:
         st.session_state.generated_code = ""
 
-    # File upload
     uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
 
     if uploaded_file is not None:
         df, error = read_csv_with_encoding(uploaded_file)
-
         if error:
             st.error(error)
             return
-
         st.session_state.df = df
 
-        # Display columns
         st.write("## Available Columns")
         st.write(list(df.columns))
 
-        # Input from the user
         st.write("## Describe the filter you want to apply")
-        user_prompt = st.text_area(
-            "Enter your filter prompt (e.g., 'Show me the high profits in the southern region where product's sale is greater than 1000')",
-            height=100,
-            placeholder="Write your filtering condition here"
-        )
+        user_prompt = st.text_area("Enter your filter prompt", height=100)
 
         if st.button("Generate Pandas Code and Filter Data"):
-            try:
-                # Initialize AI model
-                model = initialize_gemini()
+            model = initialize_gemini()
+            pandas_code = generate_pandas_filter_code(model, user_prompt, list(df.columns))
+            st.write("### Generated Pandas Code")
+            st.code(pandas_code, language='python')
 
-                # Generate Pandas code based on the user's prompt
-                pandas_code = generate_pandas_filter_code(model, user_prompt, list(df.columns))
-                st.write("### Generated Pandas Code")
-                st.code(pandas_code, language='python')
+            st.session_state.generated_code = pandas_code
+            filtered_df = filter_data_with_pandas_code(df, pandas_code)
 
-                # Save the generated code to session state
-                st.session_state.generated_code = pandas_code
+            if filtered_df is not None:
+                st.session_state.filtered_df = filtered_df
+                st.write("### Filtered Data")
+                st.write(filtered_df)
 
-                # Execute the Pandas code to filter the data
-                filtered_df = filter_data_with_pandas_code(df, pandas_code)
-
-                if filtered_df is not None:
-                    st.session_state.filtered_df = filtered_df
-                    st.write("### Filtered Data")
-                    st.write(filtered_df)
-
-            except Exception as e:
-                st.error(f"Error generating pandas code: {str(e)}")
-
-        # Option to display the filtered DataFrame
         if st.session_state.filtered_df is not None:
             st.write("## Filtered Data")
             st.write(st.session_state.filtered_df)
